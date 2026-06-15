@@ -133,6 +133,16 @@ hr{border:none;border-top:1px solid var(--border);margin:18px 0;}
 
 .cursor{display:inline-block;width:2px;height:0.85em;background:var(--red);margin-left:2px;vertical-align:text-bottom;animation:blink 0.7s steps(1) infinite;}
 @keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+/* ── search box ── */
+.search-wrap{position:relative;margin-bottom:10px;}
+.hero-search{width:100%;background:#0A0A18;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Inter',sans-serif;font-size:0.85rem;padding:9px 14px 9px 36px;outline:none;transition:border-color 0.15s;}
+.hero-search:focus{border-color:var(--red);}
+.hero-search::placeholder{color:var(--dim);}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--dim);font-size:0.85rem;pointer-events:none;}
+/* ── active slot highlight ── */
+.slot.active-slot{border-color:var(--gold)!important;border-style:solid!important;box-shadow:0 0 12px rgba(255,215,0,0.3);}
+.slot.active-slot .slot-plus{color:var(--gold);}
+
 
 @media(max-width:500px){
   .team-slots{grid-template-columns:repeat(3,1fr);}
@@ -152,11 +162,11 @@ hr{border:none;border-top:1px solid var(--border);margin:18px 0;}
 <div class="card">
   <div class="sec-title">STEP 1 — YOUR TEAM'S PICKS (up to 5)</div>
   <div class="team-slots" id="teamSlots">
-    <div class="slot" id="slot0"><span class="slot-plus">+</span><span class="slot-label">Ally 1</span></div>
-    <div class="slot" id="slot1"><span class="slot-plus">+</span><span class="slot-label">Ally 2</span></div>
-    <div class="slot" id="slot2"><span class="slot-plus">+</span><span class="slot-label">Ally 3</span></div>
-    <div class="slot" id="slot3"><span class="slot-plus">+</span><span class="slot-label">Ally 4</span></div>
-    <div class="slot" id="slot4"><span class="slot-plus">+</span><span class="slot-label">Ally 5</span></div>
+    <div class="slot" id="slot0" onclick="setActiveSlot(0)"><span class="slot-plus">+</span><span class="slot-label">Ally 1</span></div>
+    <div class="slot" id="slot1" onclick="setActiveSlot(1)"><span class="slot-plus">+</span><span class="slot-label">Ally 2</span></div>
+    <div class="slot" id="slot2" onclick="setActiveSlot(2)"><span class="slot-plus">+</span><span class="slot-label">Ally 3</span></div>
+    <div class="slot" id="slot3" onclick="setActiveSlot(3)"><span class="slot-plus">+</span><span class="slot-label">Ally 4</span></div>
+    <div class="slot" id="slot4" onclick="setActiveSlot(4)"><span class="slot-plus">+</span><span class="slot-label">Ally 5</span></div>
   </div>
 
   <!-- Role summary -->
@@ -178,6 +188,7 @@ hr{border:none;border-top:1px solid var(--border);margin:18px 0;}
     <div class="pill" data-filter="new">⭐ New</div>
     <div class="pill" data-filter="beginner">👶 Beginner</div>
   </div>
+  <div class="search-wrap"><span class="search-icon">🔍</span><input class="hero-search" id="heroSearch" type="text" placeholder="Search heroes..." oninput="buildGrid()" autocomplete="off"></div>
   <div class="hero-grid" id="heroGrid"></div>
 
   <hr>
@@ -378,11 +389,21 @@ const TEAMUP_PAIRS = {
 let teamPicks = [null,null,null,null,null];
 let myRole = 'any';
 let heroFilter = 'all';
+let activeSlot = -1;
+
+function setActiveSlot(i){
+  if(teamPicks[i]!==null) return; // don't highlight filled slots
+  activeSlot = activeSlot===i ? -1 : i;
+  updateSlots();
+}
 
 // ── Build hero grid ───────────────────────────────────────
 function buildGrid(){
   const grid = document.getElementById('heroGrid');
+  const searchEl = document.getElementById('heroSearch');
+  const q = searchEl ? searchEl.value.toLowerCase().trim() : '';
   const filtered = HEROES.filter(h=>{
+    if(q && !h.n.toLowerCase().includes(q)) return false;
     if(heroFilter==='all') return true;
     if(heroFilter==='buffed') return h.tags.includes('buffed');
     if(heroFilter==='nerfed') return h.tags.includes('nerfed');
@@ -411,9 +432,12 @@ function addToTeam(name){
     const idx = teamPicks.findIndex(h=>h&&h.n===name);
     if(idx>=0) teamPicks[idx]=null;
   } else {
-    const empty = teamPicks.findIndex(h=>h===null);
-    if(empty<0){alert('Team is full (5 allies). Remove someone first.');return;}
-    teamPicks[empty]=hero;
+    let target = -1;
+    if(activeSlot>=0 && teamPicks[activeSlot]===null) target=activeSlot;
+    else target=teamPicks.findIndex(h=>h===null);
+    if(target<0){alert('Team is full (5 allies). Remove someone first.');return;}
+    teamPicks[target]=hero;
+    activeSlot=-1;
   }
   updateSlots();
   buildGrid();
@@ -432,6 +456,9 @@ function updateSlots(){
     } else {
       slot.className='slot';
       slot.innerHTML=`<span class="slot-plus">+</span><span class="slot-label">Ally ${i+1}</span>`;
+      if(activeSlot===i) slot.classList.add('active-slot');
+      else slot.classList.remove('active-slot');
+      slot.onclick=()=>setActiveSlot(i);
     }
   }
 }
