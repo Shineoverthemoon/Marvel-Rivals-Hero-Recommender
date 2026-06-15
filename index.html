@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marvel Rivals — Hero Recommender</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Bebas+Neue&family=Inter:wght@400;500;600&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --red:#E23636;--gold:#FFD700;--blue:#1A8CFF;--green:#22C55E;
+  --dark:#070709;--panel:#0E0E14;--card:#13131C;--border:#1C1C2C;
+  --text:#EEEEFF;--dim:#5A5A7A;
+}
+body{background:var(--dark);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:28px 14px 72px;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 60% 35% at 15% 5%,rgba(226,54,54,0.07) 0%,transparent 65%),radial-gradient(ellipse 50% 30% at 85% 85%,rgba(26,140,255,0.06) 0%,transparent 65%);pointer-events:none;z-index:0;}
+
+.header{text-align:center;position:relative;z-index:1;margin-bottom:6px;}
+.title{font-family:'Bebas Neue',sans-serif;font-size:clamp(1.8rem,7vw,3.5rem);letter-spacing:0.08em;line-height:1;color:var(--text);text-shadow:0 0 30px rgba(226,54,54,0.35);}
+.title .accent{color:var(--red);}
+.subtitle{font-size:0.68rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--dim);margin-top:5px;}
+.patch-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(226,54,54,0.12);border:1px solid rgba(226,54,54,0.3);border-radius:20px;padding:4px 12px;font-size:0.65rem;letter-spacing:0.12em;text-transform:uppercase;color:#FF8888;margin-top:8px;}
+
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px 16px;width:100%;max-width:860px;position:relative;z-index:1;margin-top:18px;}
+
+/* ── section headers ── */
+.sec-title{font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:0.1em;color:var(--dim);margin-bottom:12px;}
+
+/* ── team slots ── */
+.team-slots{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:18px;}
+.slot{background:var(--card);border:1px dashed var(--border);border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;transition:all 0.15s;min-height:72px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;position:relative;}
+.slot:hover{border-color:var(--red);}
+.slot.filled{border-style:solid;}
+.slot.filled.vanguard{border-color:#FF8C42;}
+.slot.filled.duelist{border-color:var(--red);}
+.slot.filled.strategist{border-color:var(--green);}
+.slot.filled.multirole{border-color:#9B30FF;}
+.slot-label{font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--dim);}
+.slot-name{font-size:0.72rem;font-weight:600;color:var(--text);line-height:1.2;}
+.slot-role-badge{font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 5px;border-radius:6px;}
+.slot-role-badge.vanguard{background:rgba(255,140,66,0.2);color:#FF8C42;}
+.slot-role-badge.duelist{background:rgba(226,54,54,0.2);color:#FF8888;}
+.slot-role-badge.strategist{background:rgba(34,197,94,0.2);color:#22C55E;}
+.slot-role-badge.multirole{background:rgba(155,48,255,0.2);color:#B060FF;}
+.slot-clear{position:absolute;top:4px;right:6px;font-size:0.65rem;color:var(--dim);cursor:pointer;display:none;}
+.slot.filled .slot-clear{display:block;}
+.slot-plus{font-size:1.2rem;color:var(--dim);}
+
+/* ── role summary bar ── */
+.role-bar{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
+.role-pill{font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:#0A0A12;color:var(--dim);}
+.role-pill.has{border-color:#22C55E;color:#22C55E;background:rgba(34,197,94,0.08);}
+.role-pill.missing{border-color:#FF6666;color:#FF6666;background:rgba(226,54,54,0.08);}
+
+/* ── filters ── */
+.filter-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+.pill{font-size:0.67rem;letter-spacing:0.1em;text-transform:uppercase;padding:5px 11px;border-radius:20px;border:1px solid var(--border);background:#0A0A12;color:var(--dim);cursor:pointer;transition:all 0.12s;}
+.pill:hover{border-color:var(--red);color:var(--text);}
+.pill.active{background:var(--red);border-color:var(--red);color:#fff;}
+.pill.vanguard-pill.active{background:#FF8C42;border-color:#FF8C42;}
+.pill.strategist-pill.active{background:#22C55E;border-color:#22C55E;color:#000;}
+
+/* ── hero picker grid ── */
+.hero-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;max-height:320px;overflow-y:auto;padding-right:4px;}
+.hero-grid::-webkit-scrollbar{width:4px;}
+.hero-grid::-webkit-scrollbar-thumb{background:#222;border-radius:2px;}
+
+.hero-btn{
+  background:var(--card);border:1px solid var(--border);border-radius:8px;
+  padding:8px 10px;cursor:pointer;text-align:left;
+  display:flex;flex-direction:column;gap:3px;
+  transition:border-color 0.12s,background 0.12s;
+  position:relative;overflow:hidden;
+}
+.hero-btn:hover{border-color:var(--red);background:#17172A;}
+.hero-btn.selected{border-color:var(--blue);background:rgba(26,140,255,0.08);}
+.hero-btn-name{font-size:0.78rem;font-weight:600;color:var(--text);line-height:1.2;}
+.hero-btn-role{font-size:0.58rem;letter-spacing:0.1em;text-transform:uppercase;}
+.hero-btn-role.vanguard{color:#FF8C42;}
+.hero-btn-role.duelist{color:#FF8888;}
+.hero-btn-role.strategist{color:#22C55E;}
+.hero-btn-role.multirole{color:#B060FF;}
+.badges{display:flex;gap:3px;flex-wrap:wrap;margin-top:2px;}
+.badge{font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;padding:1px 4px;border-radius:4px;font-weight:600;}
+.badge.buffed{background:rgba(34,197,94,0.2);color:#22C55E;}
+.badge.nerfed{background:rgba(226,54,54,0.2);color:#FF8888;}
+.badge.new{background:rgba(255,215,0,0.2);color:#FFD700;}
+.badge.safe{background:rgba(26,140,255,0.15);color:#88BBFF;}
+.badge.beginner{background:rgba(100,200,100,0.15);color:#88DD88;}
+.badge.skilled{background:rgba(200,100,200,0.15);color:#DD88DD;}
+
+/* ── divider ── */
+hr{border:none;border-top:1px solid var(--border);margin:18px 0;}
+
+/* ── recommend button ── */
+.btn-wrap{display:flex;justify-content:center;}
+.btn-rec{font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:0.1em;background:linear-gradient(135deg,#C0181A,#E23636);color:#fff;border:none;border-radius:8px;padding:13px 40px;cursor:pointer;transition:transform 0.12s,box-shadow 0.15s;}
+.btn-rec:hover{transform:scale(1.04);box-shadow:0 0 22px rgba(226,54,54,0.4);}
+.btn-rec:active{transform:scale(0.97);}
+
+/* ── results ── */
+#results{display:none;flex-direction:column;gap:12px;margin-top:18px;}
+
+.result-header{
+  font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:0.1em;
+  color:var(--dim);margin-bottom:6px;
+}
+.rec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
+
+.rec-card{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:14px 12px;display:flex;flex-direction:column;gap:6px;
+  position:relative;overflow:hidden;transition:border-color 0.15s;
+}
+.rec-card.top-pick{border-color:var(--gold);}
+.rec-card.top-pick::before{content:'⭐ TOP PICK';position:absolute;top:8px;right:8px;font-size:0.5rem;letter-spacing:0.12em;color:var(--gold);font-weight:700;}
+.rec-card.teamup-boost{border-color:#B060FF;}
+.rec-card.teamup-boost::before{content:'🔗 TEAM-UP BOOST';position:absolute;top:8px;right:8px;font-size:0.5rem;letter-spacing:0.1em;color:#B060FF;font-weight:700;}
+
+.rec-name{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:0.06em;color:var(--text);}
+.rec-role{font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:2px;}
+.rec-role.vanguard{color:#FF8C42;}
+.rec-role.duelist{color:#FF8888;}
+.rec-role.strategist{color:#22C55E;}
+.rec-role.multirole{color:#B060FF;}
+.rec-reason{font-size:0.74rem;color:#9090AA;line-height:1.45;}
+.rec-badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px;}
+
+.no-rec{text-align:center;color:var(--dim);font-size:0.85rem;padding:20px;font-style:italic;}
+
+.warning-box{background:rgba(226,54,54,0.08);border:1px solid rgba(226,54,54,0.2);border-radius:8px;padding:10px 12px;font-size:0.78rem;color:#FF9999;line-height:1.5;}
+.good-box{background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:10px 12px;font-size:0.78rem;color:#88DD88;line-height:1.5;}
+
+.cursor{display:inline-block;width:2px;height:0.85em;background:var(--red);margin-left:2px;vertical-align:text-bottom;animation:blink 0.7s steps(1) infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+
+@media(max-width:500px){
+  .team-slots{grid-template-columns:repeat(3,1fr);}
+  .hero-grid{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">MARVEL <span class="accent">RIVALS</span></div>
+  <div class="subtitle">Hero Recommender — Season 8.5</div>
+  <div class="patch-badge">🟢 Live · Season 8.5 · Patch 20260612 · 51 Heroes</div>
+</div>
+
+<!-- Step 1: Team comp -->
+<div class="card">
+  <div class="sec-title">STEP 1 — YOUR TEAM'S PICKS (up to 5)</div>
+  <div class="team-slots" id="teamSlots">
+    <div class="slot" id="slot0"><span class="slot-plus">+</span><span class="slot-label">Ally 1</span></div>
+    <div class="slot" id="slot1"><span class="slot-plus">+</span><span class="slot-label">Ally 2</span></div>
+    <div class="slot" id="slot2"><span class="slot-plus">+</span><span class="slot-label">Ally 3</span></div>
+    <div class="slot" id="slot3"><span class="slot-plus">+</span><span class="slot-label">Ally 4</span></div>
+    <div class="slot" id="slot4"><span class="slot-plus">+</span><span class="slot-label">Ally 5</span></div>
+  </div>
+
+  <!-- Role summary -->
+  <div class="role-bar" id="roleBar">
+    <div class="role-pill" id="rb-vanguard">🛡 Vanguard: 0</div>
+    <div class="role-pill" id="rb-duelist">⚔ Duelist: 0</div>
+    <div class="role-pill" id="rb-strategist">💚 Strategist: 0</div>
+  </div>
+
+  <!-- Hero picker -->
+  <div class="sec-title">STEP 2 — PICK HEROES TO ADD TO TEAM</div>
+  <div class="filter-row">
+    <div class="pill active" data-filter="all">All</div>
+    <div class="pill vanguard-pill" data-filter="vanguard">Vanguard</div>
+    <div class="pill" data-filter="duelist">Duelist</div>
+    <div class="pill strategist-pill" data-filter="strategist">Strategist</div>
+    <div class="pill" data-filter="buffed">🟢 Buffed</div>
+    <div class="pill" data-filter="nerfed">🔴 Nerfed</div>
+    <div class="pill" data-filter="new">⭐ New</div>
+    <div class="pill" data-filter="beginner">👶 Beginner</div>
+  </div>
+  <div class="hero-grid" id="heroGrid"></div>
+
+  <hr>
+
+  <!-- Step 3 role pref -->
+  <div class="sec-title">STEP 3 — YOUR PREFERRED ROLE</div>
+  <div class="filter-row" id="myRoleRow">
+    <div class="pill active" data-myrole="any">Any Role</div>
+    <div class="pill vanguard-pill" data-myrole="vanguard">I'll Tank</div>
+    <div class="pill" data-myrole="duelist">I'll DPS</div>
+    <div class="pill strategist-pill" data-myrole="strategist">I'll Support</div>
+  </div>
+
+  <div class="btn-wrap">
+    <button class="btn-rec" id="recBtn">⚡ RECOMMEND MY HERO</button>
+  </div>
+
+  <div id="results"></div>
+</div>
+
+<script>
+// ── Full 51-hero roster Season 8.5 ───────────────────────
+const HEROES = [
+  // VANGUARDS (13)
+  {n:"Thor",              role:"vanguard", tags:["safe"],        teamups:["Hela","Jane Foster Thor"], difficulty:2,
+    solo:"Strong frontline with self-sustain and mobility. Good solo queue pick.",
+    reasons:{vanguard:"Hard-charging Vanguard who opens space with hammer throws and lightning.",duelist:"",strategist:""}},
+  {n:"Captain America",   role:"vanguard", tags:["beginner","safe"], teamups:["Bucky","Iron Man"], difficulty:1,
+    solo:"Most beginner-friendly tank. Excellent for learning frontline positioning.",
+    reasons:{vanguard:"Easiest Vanguard to learn. Shield, charge, rally — simple but effective.",duelist:"",strategist:""}},
+  {n:"Hulk",              role:"vanguard", tags:["safe"],        teamups:["Doctor Strange"], difficulty:2,
+    solo:"Hulk mode gives you a panic button. Great for randoms.",
+    reasons:{vanguard:"Massive health pool, World Breaker ult can flip fights instantly.",duelist:"",strategist:""}},
+  {n:"Magneto",           role:"vanguard", tags:["buffed","safe"], teamups:["Scarlet Witch","Rogue","Gambit"], difficulty:2,
+    solo:"Buffed this patch — better survivability and ult effectiveness. Solid pick.",
+    reasons:{vanguard:"Buffed in S8.5. Metal Shield and projectile absorption make him a reliable anchor.",duelist:"",strategist:""}},
+  {n:"Doctor Strange",    role:"vanguard", tags:["skilled"],     teamups:["Hulk","Ancient One"], difficulty:3,
+    solo:"High skill ceiling but incredibly impactful portal ult.",
+    reasons:{vanguard:"Portal ult changes team positions mid-fight. One of the highest-impact Vanguards if mastered.",duelist:"",strategist:""}},
+  {n:"Venom",             role:"vanguard", tags:["safe"],        teamups:["Spider-Man","Spider-Gwen"], difficulty:2,
+    solo:"Aggressive dive tank. Good for players who don't like static frontlines.",
+    reasons:{vanguard:"Burrow and Venom Swing let him play more aggressively than other tanks.",duelist:"",strategist:""}},
+  {n:"Groot",             role:"vanguard", tags:["beginner","safe"], teamups:["Rocket Raccoon"], difficulty:1,
+    solo:"Easy to play. Walls alone can win rounds.",
+    reasons:{vanguard:"Wall placement is game-changing. Passive healing keeps him up. Great with Rocket team-up.",duelist:"",strategist:""}},
+  {n:"Peni Parker",       role:"vanguard", tags:["skilled","safe"], teamups:["Spider-Man"], difficulty:3,
+    solo:"Highest win rate Vanguard in Season 8. Top pick if you know the mines.",
+    reasons:{vanguard:"S-tier win rate. Mine network controls zones, nest blocks lanes. Strongest Vanguard right now.",duelist:"",strategist:""}},
+  {n:"Angela",            role:"vanguard", tags:["buffed","safe"], teamups:[], difficulty:2,
+    solo:"Just got buffed — swifter and sturdier. Strong frontline brawler.",
+    reasons:{vanguard:"Buffed in S8.5 for speed and survivability. Aggressive frontline fighter.",duelist:"",strategist:""}},
+  {n:"The Thing",         role:"vanguard", tags:["safe"],        teamups:["Mr. Fantastic","Human Torch","Invisible Woman"], difficulty:2,
+    solo:"Rock solid anchor. Won't carry but rarely throws.",
+    reasons:{vanguard:"Wins most Vanguard 1v1s. Tanky, straightforward, reliable.",duelist:"",strategist:""}},
+  {n:"Rogue",             role:"vanguard", tags:["buffed"],      teamups:["Gambit","Magneto"], difficulty:3,
+    solo:"Buffed this patch. Power absorption ult is one of the most fun abilities in the game.",
+    reasons:{vanguard:"Mobility and damage buffs in S8.5. Power absorption can steal enemy ultimates.",duelist:"",strategist:""}},
+  {n:"Devil Dinosaur",    role:"vanguard", tags:["nerfed"],      teamups:[], difficulty:2,
+    solo:"Nerfed this patch — reduced CC, bleed damage, and barrier uptime. Still playable.",
+    reasons:{vanguard:"Nerfed in S8.5 but still a large, threatening frontline presence.",duelist:"",strategist:""}},
+  {n:"Mister Fantastic",  role:"vanguard", tags:["skilled"],     teamups:["Invisible Woman","Human Torch","The Thing"], difficulty:3,
+    solo:"Unique stretch mechanics. High skill floor.",
+    reasons:{vanguard:"Reach and stretch-based disruption. Strong Fantastic Four synergy.",duelist:"",strategist:""}},
+
+  // DUELISTS (26)
+  {n:"Iron Man",          role:"duelist",  tags:["safe"],        teamups:["Pepper Potts","Captain America"], difficulty:2,
+    solo:"Classic safe DPS pick. Repulsor stream rewards accuracy.",
+    reasons:{duelist:"Consistent aerial DPS with reliable ult. Good at all ranks.",vanguard:"",strategist:""}},
+  {n:"Black Widow",       role:"duelist",  tags:[],              teamups:["Hawkeye"], difficulty:3,
+    solo:"Low win rate currently (~42%). Hard to play effectively with randoms.",
+    reasons:{duelist:"Spy gadgets and sniper combo. Underperforming this meta.",vanguard:"",strategist:""}},
+  {n:"Hawkeye",           role:"duelist",  tags:[],              teamups:["Black Widow"], difficulty:3,
+    solo:"Sitting around 47% win rate. Requires good aim and communication.",
+    reasons:{duelist:"Hitscan arrows and utility quiver. Better with coordinated teams.",vanguard:"",strategist:""}},
+  {n:"Storm",             role:"duelist",  tags:[],              teamups:["Thor","Black Panther"], difficulty:2,
+    solo:"Air superiority gives her angles most ground heroes can't contest.",
+    reasons:{duelist:"Flight and weather control. Forces enemies to play on her terms.",vanguard:"",strategist:""}},
+  {n:"Hela",              role:"duelist",  tags:["skilled"],     teamups:["Thor","Loki"], difficulty:3,
+    solo:"Still A-tier. Strong sustained damage at range. Lost top spot to Phoenix buffs.",
+    reasons:{duelist:"Eternal Hel blades sustained damage is devastating. Very strong still.",vanguard:"",strategist:""}},
+  {n:"Scarlet Witch",     role:"duelist",  tags:[],              teamups:["Magneto","Vision"], difficulty:2,
+    solo:"Chaos magic disruption. Needs frontline to peel for her.",
+    reasons:{duelist:"Reality warping can negate enemy ults. Disruptive pick.",vanguard:"",strategist:""}},
+  {n:"Spider-Man",        role:"duelist",  tags:["skilled"],     teamups:["Venom","Spider-Gwen"], difficulty:4,
+    solo:"Highest skill ceiling in the game. Incredible when mastered, throws when not.",
+    reasons:{duelist:"Web-swinging mobility makes him nearly impossible to pin. Very high skill floor.",vanguard:"",strategist:""}},
+  {n:"Wolverine",         role:"duelist",  tags:["safe"],        teamups:["Cyclops","Jean Grey","X-23"], difficulty:2,
+    solo:"Self-sustain through berserker rage. Hard to kill. Gets Cyclops team-up boost.",
+    reasons:{duelist:"Regeneration and dive make him a consistent threat. New Blast Slash team-up with Cyclops.",vanguard:"",strategist:""}},
+  {n:"Magik",             role:"duelist",  tags:["skilled","safe"], teamups:[], difficulty:3,
+    solo:"Top Duelist S-tier win rate. Strong if you learn her portals.",
+    reasons:{duelist:"S-tier Duelist. Teleport sword combos devastate targets. Highest Duelist win rate.",vanguard:"",strategist:""}},
+  {n:"Moon Knight",       role:"duelist",  tags:["nerfed"],      teamups:[], difficulty:3,
+    solo:"Nerfed this patch. Still has good zone control but took real hits.",
+    reasons:{duelist:"Nerfed in S8.5. Crescent dart zoning is still useful but power level reduced.",vanguard:"",strategist:""}},
+  {n:"Star-Lord",         role:"duelist",  tags:["nerfed"],      teamups:["Mantis","Gamora"], difficulty:2,
+    solo:"Nerfed this patch. Was a top pick, now sliding down the tier list.",
+    reasons:{duelist:"Nerfed in S8.5. Blasters and jet boots mobility still fun, less dominant.",vanguard:"",strategist:""}},
+  {n:"Black Panther",     role:"duelist",  tags:["skilled"],     teamups:["Storm","Shuri"], difficulty:3,
+    solo:"Dive assassin. Great at one-shotting targets but requires target selection.",
+    reasons:{duelist:"Vibranium daggers and kinetic armor let him delete single targets.",vanguard:"",strategist:""}},
+  {n:"Human Torch",       role:"duelist",  tags:["buffed"],      teamups:["Invisible Woman","Mr. Fantastic","The Thing"], difficulty:2,
+    solo:"Just buffed — projectile speed and count increased. Rising up the tier list.",
+    reasons:{duelist:"Buffed in S8.5. Fire clusters faster and more numerous now. Good DPS choice.",vanguard:"",strategist:""}},
+  {n:"Winter Soldier",    role:"duelist",  tags:["safe"],        teamups:["Captain America"], difficulty:2,
+    solo:"Versatile — can shoot from distance or charge in. Good for randoms.",
+    reasons:{duelist:"Bionic arm charge and SMG offer flexible range options.",vanguard:"",strategist:""}},
+  {n:"Punisher",          role:"duelist",  tags:["beginner","safe"], teamups:[], difficulty:1,
+    solo:"Easiest DPS. Point and shoot. Good for warming up.",
+    reasons:{duelist:"Straightforward gunplay. Machine gun turret controls space. Beginner-friendly damage dealer.",vanguard:"",strategist:""}},
+  {n:"Phoenix",           role:"duelist",  tags:["nerfed","skilled"], teamups:["Wolverine","Cyclops"], difficulty:3,
+    solo:"Nerfed this patch after dominating. Still good but less oppressive.",
+    reasons:{duelist:"Nerfed in S8.5. Telekinetic power and rebirth mechanic still impactful.",vanguard:"",strategist:""}},
+  {n:"Black Cat",         role:"duelist",  tags:["nerfed","skilled"], teamups:[], difficulty:3,
+    solo:"Heavy nerfs this patch — damage, charges, and ult range all reduced.",
+    reasons:{duelist:"Heavily nerfed in S8.5. Cat's Cradle damage dropped, charges reduced. Tier list fall incoming.",vanguard:"",strategist:""}},
+  {n:"Namor",             role:"duelist",  tags:["buffed"],      teamups:[], difficulty:2,
+    solo:"Buffed this patch. Underwater summoning and trident are more effective now.",
+    reasons:{duelist:"Buffed in S8.5. Atlantean summons control space, trident has strong range.",vanguard:"",strategist:""}},
+  {n:"Daredevil",         role:"duelist",  tags:["nerfed","skilled"], teamups:[], difficulty:3,
+    solo:"Nerfed this patch — damage and mobility reduced. High skill floor already.",
+    reasons:{duelist:"Nerfed in S8.5. Radar sense and billy clubs still make him a capable flanker.",vanguard:"",strategist:""}},
+  {n:"Blade",             role:"duelist",  tags:["buffed"],      teamups:["Morbius","Ghost Rider"], difficulty:2,
+    solo:"Buffed this patch — mobility and damage up simultaneously. Watch this space.",
+    reasons:{duelist:"Buffed in S8.5 with both mobility and damage. Rogue and Blade are the patch winners.",vanguard:"",strategist:""}},
+  {n:"Elsa Bloodstone",   role:"duelist",  tags:["buffed","safe"], teamups:[], difficulty:2,
+    solo:"Buffed this patch after prior nerfs. Hitscan duelist with great lethality-survivability balance.",
+    reasons:{duelist:"Buffed in S8.5. Hitscan accuracy rewards good aim. Excellent all-around Duelist.",vanguard:"",strategist:""}},
+  {n:"Iron Fist",         role:"duelist",  tags:["skilled"],     teamups:[], difficulty:3,
+    solo:"Pure melee — requires getting in close. Not great with randoms.",
+    reasons:{duelist:"Chi-powered melee combos hit hard up close. Struggles at range.",vanguard:"",strategist:""}},
+  {n:"Squirrel Girl",     role:"duelist",  tags:["beginner"],    teamups:[], difficulty:1,
+    solo:"Simple AOE projectiles. Easy to contribute with minimal effort.",
+    reasons:{duelist:"Acorn throws and squirrel army are easy to land. Beginner-friendly damage.",vanguard:"",strategist:""}},
+  {n:"Spider-Gwen",       role:"duelist",  tags:["skilled"],     teamups:["Spider-Man","Venom"], difficulty:3,
+    solo:"Agile flanker. Similar high skill floor to Spider-Man.",
+    reasons:{duelist:"Web-based mobility and evasion. Strong flanker with spider synergy.",vanguard:"",strategist:""}},
+  {n:"Cyclops",           role:"duelist",  tags:["new","buffed"], teamups:["Wolverine","Phoenix"], difficulty:2,
+    solo:"Brand new in S8.5. Optic blasts hit hard at mid-range. Blast Slash team-up with Wolverine is strong.",
+    reasons:{duelist:"NEW in S8.5. Optic blast primary, 2-star difficulty. Blast Slash team-up with Wolverine boosts both fighters.",vanguard:"",strategist:""}},
+  {n:"Gamora",            role:"duelist",  tags:[],              teamups:["Star-Lord","Mantis"], difficulty:2,
+    solo:"Aggressive melee-range duelist with good combo potential.",
+    reasons:{duelist:"Godslayer blade closes distance fast. Strong burst combo.",vanguard:"",strategist:""}},
+
+  // STRATEGISTS (11)
+  {n:"Rocket Raccoon",    role:"strategist", tags:["beginner","safe"], teamups:["Groot"], difficulty:1,
+    solo:"Best beginner support. Revive beacon wins rounds. #1 Strategist win rate.",
+    reasons:{strategist:"S-tier win rate. Revive beacon is the most impactful support tool in the game. Easy to contribute.",vanguard:"",duelist:""}},
+  {n:"Cloak & Dagger",    role:"strategist", tags:["buffed","safe"], teamups:[], difficulty:2,
+    solo:"Buffed this patch. One of the best solo queue supports — provides both damage immunity and heals.",
+    reasons:{strategist:"Buffed in S8.5. Phase-shift and dagger throw combo heals and damages simultaneously. Excellent solo queue support.",vanguard:"",duelist:""}},
+  {n:"Adam Warlock",      role:"strategist", tags:["buffed","safe"], teamups:[], difficulty:2,
+    solo:"Buffed this patch. Team revive ult is one of the best in the game.",
+    reasons:{strategist:"Buffed in S8.5. Quantum magic heals and quantum cocoon revives. Ult can revive entire team.",vanguard:"",duelist:""}},
+  {n:"Luna Snow",         role:"strategist", tags:["beginner","safe"], teamups:[], difficulty:1,
+    solo:"Easiest support. K-pop dance heals, simple kit. Good starter strategist.",
+    reasons:{strategist:"Straightforward healing with ice ring. Ultimate provides team-wide damage boost. Beginner friendly.",vanguard:"",duelist:""}},
+  {n:"Loki",              role:"strategist", tags:["skilled"],    teamups:["Thor","Hela"], difficulty:4,
+    solo:"Highest skill ceiling support. God if mastered, throws if not. Copies enemy ultimates.",
+    reasons:{strategist:"Clone projection and ult copying make him the highest-impact support. Very high skill requirement.",vanguard:"",duelist:""}},
+  {n:"Mantis",            role:"strategist", tags:["safe"],       teamups:["Star-Lord","Gamora"], difficulty:2,
+    solo:"Healing pulse and damage boost. Strong pair with any DPS.",
+    reasons:{strategist:"Healing seeds and damage amp buff make her an effective passive support.",vanguard:"",duelist:""}},
+  {n:"Invisible Woman",   role:"strategist", tags:["safe"],       teamups:["Mr. Fantastic","Human Torch","The Thing"], difficulty:2,
+    solo:"Force field shields block huge damage. Consistent support.",
+    reasons:{strategist:"Force field shields protect allies from burst damage. Strong defensive support.",vanguard:"",duelist:""}},
+  {n:"Jeff the Land Shark", role:"strategist", tags:["beginner","safe"], teamups:[], difficulty:1,
+    solo:"Adorable and effective. Hide-and-seek survival plus heal zones. A-tier.",
+    reasons:{strategist:"Healing shark zone and burrow are unique. Good sustain support.",vanguard:"",duelist:""}},
+  {n:"Ultron",            role:"strategist", tags:["nerfed","skilled"], teamups:[], difficulty:3,
+    solo:"Nerfed this patch — higher ult cost and drone range reduced.",
+    reasons:{strategist:"Nerfed in S8.5. Drone healing still provides passive sustain. Ult cost now higher.",vanguard:"",duelist:""}},
+  {n:"Gambit",            role:"strategist", tags:["nerfed","skilled"], teamups:["Rogue","Magneto"], difficulty:3,
+    solo:"Nerfed from multiple angles this patch. High skill, lower reward now.",
+    reasons:{strategist:"Nerfed in S8.5 — Ragin' Royal Flush nerfed AND team-up nerfed. Harder to justify now.",vanguard:"",duelist:""}},
+  {n:"White Fox",         role:"strategist", tags:["nerfed"],     teamups:[], difficulty:2,
+    solo:"Nerfed this patch — CC radius reduced. Still a capable support.",
+    reasons:{strategist:"Nerfed in S8.5 — Spectral Surge CC radius reduced. Korean mythology charms still provide utility.",vanguard:"",duelist:""}},
+
+  // MULTI-ROLE
+  {n:"Deadpool",          role:"multirole",  tags:["skilled","safe"], teamups:[], difficulty:3,
+    solo:"Only triple-role hero. Upgradable kit lets him adapt mid-game. Very versatile.",
+    reasons:{duelist:"Pistols and katanas deal high burst. Strongest role for Deadpool.",vanguard:"Tank Pool ult has high value. Unique frontline option.",strategist:"Support Pool resets ult progress on death — risky with randoms."}},
+];
+
+// ── Team-Up detection for boost ───────────────────────────
+const TEAMUP_PAIRS = {
+  "Wolverine":    [{partner:"Cyclops",   ability:"Blast Slash",        desc:"Cyclops optic blasts supercharge Wolverine's claws — both get enhanced."},{partner:"Jean Grey", ability:"Primal Flame (broken)", desc:"Wolverine was pulled from Jean Grey's Primal Flame team-up in S8.5."}],
+  "Cyclops":      [{partner:"Wolverine", ability:"Blast Slash",        desc:"New S8.5 team-up — Cyclops charges and Wolverine delivers an optic-energy claw slash."}],
+  "Groot":        [{partner:"Rocket Raccoon", ability:"Rocket & Groot", desc:"Classic duo. Rocket rides Groot for mobility and healing combo."}],
+  "Rocket Raccoon":[{partner:"Groot",   ability:"Rocket & Groot",      desc:"Classic duo. Extra healing uptime when played together."}],
+  "Magneto":      [{partner:"Rogue",    ability:"Explosive Entanglement (nerfed)", desc:"Team-up nerfed in S8.5 — healing and damage reduced."}],
+  "Rogue":        [{partner:"Magneto",  ability:"Explosive Entanglement (nerfed)", desc:"Team-up nerfed in S8.5 — still active but less powerful."}],
+  "Captain America":[{partner:"Iron Man", ability:"Avengers Assembly", desc:"Shield boost and repulsor combo."}],
+};
+
+// ── State ─────────────────────────────────────────────────
+let teamPicks = [null,null,null,null,null];
+let myRole = 'any';
+let heroFilter = 'all';
+
+// ── Build hero grid ───────────────────────────────────────
+function buildGrid(){
+  const grid = document.getElementById('heroGrid');
+  const filtered = HEROES.filter(h=>{
+    if(heroFilter==='all') return true;
+    if(heroFilter==='buffed') return h.tags.includes('buffed');
+    if(heroFilter==='nerfed') return h.tags.includes('nerfed');
+    if(heroFilter==='new') return h.tags.includes('new');
+    if(heroFilter==='beginner') return h.tags.includes('beginner');
+    return h.role===heroFilter;
+  });
+  const inTeam = teamPicks.filter(Boolean).map(h=>h.n);
+  grid.innerHTML = filtered.map(h=>{
+    const sel = inTeam.includes(h.n) ? 'selected' : '';
+    const badgeHtml = h.tags.map(t=>`<span class="badge ${t}">${t}</span>`).join('');
+    return `<button class="hero-btn ${sel}" onclick="addToTeam('${h.n.replace(/'/g,"\\'")}')">
+      <div class="hero-btn-name">${h.n}</div>
+      <div class="hero-btn-role ${h.role}">${h.role}</div>
+      <div class="badges">${badgeHtml}</div>
+    </button>`;
+  }).join('');
+}
+
+function addToTeam(name){
+  const hero = HEROES.find(h=>h.n===name);
+  if(!hero) return;
+  const inTeam = teamPicks.filter(Boolean).map(h=>h.n);
+  if(inTeam.includes(name)){
+    // remove
+    const idx = teamPicks.findIndex(h=>h&&h.n===name);
+    if(idx>=0) teamPicks[idx]=null;
+  } else {
+    const empty = teamPicks.findIndex(h=>h===null);
+    if(empty<0){alert('Team is full (5 allies). Remove someone first.');return;}
+    teamPicks[empty]=hero;
+  }
+  updateSlots();
+  buildGrid();
+  updateRoleBar();
+}
+
+function updateSlots(){
+  for(let i=0;i<5;i++){
+    const slot=document.getElementById('slot'+i);
+    const h=teamPicks[i];
+    if(h){
+      slot.className=`slot filled ${h.role}`;
+      slot.innerHTML=`<span class="slot-clear" onclick="clearSlot(${i})">✕</span>
+        <span class="slot-role-badge ${h.role}">${h.role}</span>
+        <span class="slot-name">${h.n}</span>`;
+    } else {
+      slot.className='slot';
+      slot.innerHTML=`<span class="slot-plus">+</span><span class="slot-label">Ally ${i+1}</span>`;
+    }
+  }
+}
+
+function clearSlot(i){
+  teamPicks[i]=null;
+  updateSlots();
+  buildGrid();
+  updateRoleBar();
+}
+
+function updateRoleBar(){
+  const picks=teamPicks.filter(Boolean);
+  const v=picks.filter(h=>h.role==='vanguard').length;
+  const d=picks.filter(h=>h.role==='duelist').length;
+  const s=picks.filter(h=>h.role==='strategist'||h.role==='multirole').length;
+  const vp=document.getElementById('rb-vanguard');
+  const dp=document.getElementById('rb-duelist');
+  const sp=document.getElementById('rb-strategist');
+  vp.textContent=`🛡 Vanguard: ${v}`;
+  vp.className=`role-pill ${v>0?'has':'missing'}`;
+  dp.textContent=`⚔ Duelist: ${d}`;
+  dp.className=`role-pill ${d>0?'has':''}`;
+  sp.textContent=`💚 Strategist: ${s}`;
+  sp.className=`role-pill ${s>0?'has':'missing'}`;
+}
+
+// ── Filters ───────────────────────────────────────────────
+document.querySelectorAll('[data-filter]').forEach(p=>{
+  p.addEventListener('click',()=>{
+    document.querySelectorAll('[data-filter]').forEach(x=>x.classList.remove('active'));
+    p.classList.add('active');
+    heroFilter=p.dataset.filter;
+    buildGrid();
+  });
+});
+
+document.querySelectorAll('[data-myrole]').forEach(p=>{
+  p.addEventListener('click',()=>{
+    document.querySelectorAll('[data-myrole]').forEach(x=>x.classList.remove('active'));
+    p.classList.add('active');
+    myRole=p.dataset.myrole;
+  });
+});
+
+// ── Recommendation engine ─────────────────────────────────
+document.getElementById('recBtn').addEventListener('click',()=>{
+  const picks = teamPicks.filter(Boolean);
+  const pickedNames = picks.map(h=>h.n);
+  const vCount = picks.filter(h=>h.role==='vanguard').length;
+  const sCount = picks.filter(h=>h.role==='strategist'||h.role==='multirole').length;
+  const dCount = picks.filter(h=>h.role==='duelist').length;
+
+  // what the team needs
+  const needsTank = vCount===0;
+  const needsSupport = sCount===0;
+  const hasWolverine = pickedNames.includes('Wolverine');
+  const hasCyclops = pickedNames.includes('Cyclops');
+  const hasGroot = pickedNames.includes('Groot');
+
+  // score every hero
+  const candidates = HEROES.filter(h=>!pickedNames.includes(h.n)).map(h=>{
+    let score=0;
+    let reasons=[];
+    let boost=false;
+
+    // role filter
+    if(myRole!=='any' && h.role!==myRole && !(myRole==='strategist'&&h.role==='multirole')) {
+      return null;
+    }
+
+    // team needs scoring
+    if(needsTank && h.role==='vanguard'){score+=30;reasons.push('Your team has NO tank — this fills the most critical gap');}
+    if(needsSupport && (h.role==='strategist'||h.role==='multirole')){score+=30;reasons.push('Your team has NO healer — this is urgent');}
+    if(!needsTank && !needsSupport && h.role==='duelist'){score+=15;reasons.push('Team has tank and support — go DPS');}
+
+    // patch status
+    if(h.tags.includes('buffed')){score+=12;reasons.push('Currently buffed in S8.5 — above average right now');}
+    if(h.tags.includes('nerfed')){score-=8;reasons.push('Nerfed in S8.5 — below average this patch');}
+    if(h.tags.includes('new')){score+=5;reasons.push('Brand new — opponents less familiar with counters');}
+
+    // solo queue friendliness
+    if(h.tags.includes('safe')){score+=10;reasons.push('Solo queue safe — works well with randoms');}
+    if(h.tags.includes('beginner')){score+=6;reasons.push('Beginner friendly — easy to contribute immediately');}
+
+    // team-up boosts
+    if(hasWolverine && h.n==='Cyclops'){score+=25;boost=true;reasons.push('🔗 TEAM-UP: Your team has Wolverine — Blast Slash gives both fighters enhanced abilities');}
+    if(hasCyclops && h.n==='Wolverine'){score+=25;boost=true;reasons.push('🔗 TEAM-UP: Your team has Cyclops — Blast Slash team-up active');}
+    if(hasGroot && h.n==='Rocket Raccoon'){score+=15;boost=true;reasons.push('🔗 TEAM-UP: Your team has Groot — Rocket & Groot combo active');}
+
+    // top tier picks
+    if(['Peni Parker','Magik','Rocket Raccoon','Devil Dinosaur'].includes(h.n)){score+=8;reasons.push('S-tier win rate this season');}
+
+    const reason = reasons.slice(0,3).join(' · ');
+    return {hero:h, score, reason, boost};
+  }).filter(Boolean);
+
+  candidates.sort((a,b)=>b.score-a.score);
+  const top = candidates.slice(0,6);
+
+  // build output
+  const resultsEl = document.getElementById('results');
+  resultsEl.style.display='flex';
+
+  let warn='';
+  if(needsTank && myRole!=='vanguard') warn+=`⚠️ <strong>No Vanguard on your team</strong> — your team is going to melt without a tank. Consider playing one yourself or recommending a teammate takes it.<br>`;
+  if(needsSupport && myRole!=='strategist') warn+=`⚠️ <strong>No Strategist on your team</strong> — no healer means your team fights at a huge disadvantage. Consider playing support.`;
+
+  const warnHtml = warn ? `<div class="warning-box">${warn}</div>` : `<div class="good-box">✅ Team comp looks reasonable — tank and support present. Fill the DPS slot and go.</div>`;
+
+  let cards = '';
+  top.forEach((c,i)=>{
+    const heroRole = c.hero.role;
+    const isTop = i===0;
+    const cls = c.boost ? 'rec-card teamup-boost' : isTop ? 'rec-card top-pick' : 'rec-card';
+    const badgeHtml = c.hero.tags.map(t=>`<span class="badge ${t}">${t}</span>`).join('');
+    const lore = c.hero.reasons[heroRole] || c.hero.solo;
+    cards += `<div class="${cls}">
+      <div class="rec-role ${heroRole}">${heroRole}</div>
+      <div class="rec-name">${c.hero.n}</div>
+      <div class="rec-badges">${badgeHtml}</div>
+      <div class="rec-reason">${c.reason || lore}</div>
+      <div class="rec-reason" style="margin-top:4px;color:#707090;font-size:0.7rem">${lore}</div>
+    </div>`;
+  });
+
+  resultsEl.innerHTML = `
+    ${warnHtml}
+    <div class="result-header">TOP RECOMMENDATIONS FOR YOU</div>
+    <div class="rec-grid">${cards||'<div class="no-rec">No heroes match this filter. Try "Any Role".</div>'}</div>
+  `;
+  resultsEl.scrollIntoView({behavior:'smooth',block:'start'});
+});
+
+// ── Init ──────────────────────────────────────────────────
+buildGrid();
+updateRoleBar();
+</script>
+</body>
+</html>
